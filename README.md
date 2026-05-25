@@ -488,6 +488,4 @@ verständliche Fehlermeldungen statt Hänger zeigt.
 
 ## Lizenz
 
-MIT – siehe `LICENSE` (folgt). Anforderungs­spezifikation siehe `README_LTor.md`.
-
-> > > > > > > 824490acd1feb0589cd0aec0a1d647aaebc0d1f8
+GNU General Public License 3
