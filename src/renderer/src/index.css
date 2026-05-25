@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    @apply bg-ltor-paper text-ltor-ink font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Force monospace for any element with .mono */
+  .mono,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Subtle, but always-visible focus ring for keyboard users */
+  :focus-visible {
+    outline: 2px solid #0a0a0a;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-white border border-ltor-line;
+  }
+  .panel-header {
+    @apply px-3 py-2 border-b border-ltor-line text-xs uppercase tracking-wider font-semibold text-ltor-mute flex items-center justify-between;
+  }
+  .btn {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-ltor-ink bg-white text-ltor-ink hover:bg-ltor-ink hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-ltor-ink;
+  }
+  .btn-sm {
+    @apply px-2 py-1 text-xs;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 px-2 py-1 text-sm text-ltor-ink hover:bg-neutral-100 transition-colors;
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-ltor-alarm text-ltor-alarm bg-white hover:bg-ltor-alarm hover:text-white transition-colors;
+  }
+  .input {
+    @apply w-full px-2 py-1.5 text-sm border border-ltor-line bg-white text-ltor-ink focus:outline-none focus:border-ltor-ink placeholder:text-neutral-400;
+  }
+  .input-mono {
+    @apply input font-mono;
+  }
+  .label {
+    @apply text-xs uppercase tracking-wider font-semibold text-ltor-mute mb-1 block;
+  }
+  .dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs border border-ltor-line bg-white;
+  }
+  .kbd {
+    @apply px-1.5 py-0.5 text-[10px] font-mono border border-ltor-line bg-neutral-50 text-ltor-mute rounded;
+  }
+}
+
+/* Recharts overrides for clean monochrome look */
+.recharts-cartesian-axis-tick text {
+  fill: #737373;
+  font-size: 11px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+.recharts-cartesian-grid line {
+  stroke: #e5e5e5;
+}
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* Scrollbar — neutral */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border: 2px solid #ffffff;
+  border-radius: 6px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}
