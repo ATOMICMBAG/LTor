@@ -24,3 +24,9 @@ desktop.ini
 
 # notes
 archiv/
+
+#.tsbuildinfo
+.tsbuildinfo
+
+# package-lock.json
+package-lock.json
