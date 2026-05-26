@@ -26,7 +26,8 @@ desktop.ini
 archiv/
 
 #.tsbuildinfo
-.tsbuildinfo
+tsconfig.node.tsbuildinfo
+tsconfig.web.tsbuildinfo
 
 # package-lock.json
 package-lock.json
