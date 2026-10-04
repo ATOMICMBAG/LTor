@@ -14,6 +14,7 @@ import { useSensorsStore } from "../../store/sensorsStore";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { ipc } from "../../ipc";
+import { useSystemStore } from "../../store/systemStore";
 
 function statusColor(s: string): string {
   switch (s) {
@@ -122,6 +123,7 @@ export function StatusBar() {
 
 function TransportBadge() {
   const mode = ipc.mode;
+  const sysMode = useSystemStore((s) => s.info?.mode);
   if (mode === "electron") {
     return (
       <span
@@ -129,6 +131,16 @@ function TransportBadge() {
         title="Verbunden mit lokalem Electron-Backend (window.ltor)"
       >
         <Cpu size={11} /> Desktop
+      </span>
+    );
+  }
+  if (mode === "websocket" && sysMode === "demo") {
+    return (
+      <span
+        className="flex items-center gap-1 text-ltor-mute"
+        title="Öffentliche Web-Demo: eigene Sitzung, nur Laser-Simulator"
+      >
+        <Globe size={11} /> Web-Demo
       </span>
     );
   }

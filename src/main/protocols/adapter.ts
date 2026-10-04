@@ -1,4 +1,8 @@
-import type { TelemetrySample } from "@shared/types";
+import type {
+  AdapterNotice,
+  ConnectionKind,
+  TelemetrySample,
+} from "@shared/types";
 
 /**
  * Common interface every protocol adapter implements.
@@ -6,7 +10,7 @@ import type { TelemetrySample } from "@shared/types";
  */
 export interface ProtocolAdapter {
   readonly id: string;
-  readonly kind: "opcua" | "mqtt" | "rest";
+  readonly kind: ConnectionKind;
 
   connect(): Promise<void>;
   disconnect(): Promise<void>;
@@ -27,10 +31,14 @@ export interface ProtocolAdapter {
       error?: string,
     ) => void,
   ): () => void;
+
+  /** Subscribe to device notices (safety trips, limits …). Optional. */
+  onNotice?(fn: (notice: AdapterNotice) => void): () => void;
 }
 
 /** Mixin helper for adapter implementations. */
 export class AdapterEmitter {
+  private noticeSubs = new Set<(n: AdapterNotice) => void>();
   private sampleSubs = new Set<(s: TelemetrySample) => void>();
   private statusSubs = new Set<
     (
@@ -51,6 +59,21 @@ export class AdapterEmitter {
   ): () => void {
     this.statusSubs.add(fn);
     return () => this.statusSubs.delete(fn);
+  }
+
+  onNotice(fn: (n: AdapterNotice) => void): () => void {
+    this.noticeSubs.add(fn);
+    return () => this.noticeSubs.delete(fn);
+  }
+
+  protected emitNotice(n: AdapterNotice): void {
+    for (const fn of this.noticeSubs) {
+      try {
+        fn(n);
+      } catch (e) {
+        console.error("[adapter] notice subscriber failed:", e);
+      }
+    }
   }
 
   protected emitSample(s: TelemetrySample): void {

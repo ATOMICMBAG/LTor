@@ -14,6 +14,14 @@ import { ConnectionForm } from "./ConnectionForm";
 import type { Connection, ConnectionKind } from "@shared/types";
 import clsx from "clsx";
 import { ipc } from "../../ipc";
+import { useSystemStore, allowedKinds } from "../../store/systemStore";
+
+const KIND_LABEL: Record<ConnectionKind, string> = {
+  opcua: "OPC UA",
+  mqtt: "MQTT",
+  rest: "REST",
+  sim: "Laser-Simulator",
+};
 
 function statusDot(s: Connection["status"]) {
   return {
@@ -40,7 +48,10 @@ export function ConnectionsModule() {
   const upsert = useConnectionsStore((s) => s.upsert);
 
   const [editing, setEditing] = useState<Connection | "new" | null>(null);
-  const [newKind, setNewKind] = useState<ConnectionKind>("opcua");
+  const info = useSystemStore((s) => s.info);
+  const kinds = allowedKinds(info);
+  const [kindChoice, setNewKind] = useState<ConnectionKind>("opcua");
+  const newKind = kinds.includes(kindChoice) ? kindChoice : kinds[0];
   const [busy, setBusy] = useState<string | null>(null);
 
   async function handleConnect(id: string) {
@@ -75,6 +86,12 @@ export function ConnectionsModule() {
           <p className="text-sm text-ltor-mute mt-1">
             OPC UA, MQTT und REST-Geräte verwalten und steuern.
           </p>
+          {info?.mode === "demo" && (
+            <p className="text-xs text-ltor-warn mt-1">
+              Öffentliche Demo: nur Laser-Simulatoren. Echte Geräte (OPC UA,
+              MQTT, REST) gibt es in der Desktop-App.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -90,9 +107,11 @@ export function ConnectionsModule() {
               value={newKind}
               onChange={(e) => setNewKind(e.target.value as ConnectionKind)}
             >
-              <option value="opcua">OPC UA</option>
-              <option value="mqtt">MQTT</option>
-              <option value="rest">REST</option>
+              {kinds.map((k) => (
+                <option key={k} value={k}>
+                  {KIND_LABEL[k]}
+                </option>
+              ))}
             </select>
             <button className="btn" onClick={() => setEditing("new")}>
               <Plus size={14} /> Neu
@@ -213,6 +232,8 @@ function endpointSummary(c: Connection): string {
       return (c.config as { brokerUrl: string }).brokerUrl;
     case "rest":
       return (c.config as { baseUrl: string }).baseUrl;
+    case "sim":
+      return `sim://${(c.config as { model: string }).model}`;
     default:
       return "";
   }

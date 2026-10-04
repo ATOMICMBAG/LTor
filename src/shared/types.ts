@@ -1,7 +1,9 @@
 // Shared types for IPC between main and renderer.
-// Keep this file dependency-free.
+// Keep this file dependency-free (laserPhysics is pure TS, no imports).
 
-export type ConnectionKind = "opcua" | "mqtt" | "rest";
+import type { LaserModelId } from "./laserPhysics";
+
+export type ConnectionKind = "opcua" | "mqtt" | "rest" | "sim";
 
 export type ConnectionStatus =
   | "disconnected"
@@ -63,6 +65,36 @@ export interface RestConfig {
   polling: RestPoll[];
 }
 
+// ---------- Laser-Simulator ----------
+export interface SimConfig {
+  /** Which virtual laser to simulate (see LASER_MODELS). */
+  model: LaserModelId;
+  /** Telemetry rate [Hz], 1 … 10. */
+  sampleRateHz?: number;
+  /** Measurement noise scale, 0 (ideal) … 1 (rough lab). */
+  noise?: number;
+}
+
+/** Channels the simulator accepts in `connections.write`. */
+export const SIM_WRITE_CHANNELS = [
+  "current_set_mA",
+  "tec_set_C",
+  "emission",
+  "shutter",
+  "interlock",
+  "fault_reset",
+] as const;
+export type SimWriteChannel = (typeof SIM_WRITE_CHANNELS)[number];
+
+/** Operating state of the simulated laser controller. */
+export type SimLaserState =
+  | "OFF"
+  | "ARMING"
+  | "ON"
+  | "LASING"
+  | "INTERLOCK"
+  | "FAULT";
+
 export interface Connection {
   id: string;
   name: string;
@@ -70,7 +102,7 @@ export interface Connection {
   status: ConnectionStatus;
   lastError?: string;
   createdAt: number;
-  config: OpcUaConfig | MqttConfig | RestConfig;
+  config: OpcUaConfig | MqttConfig | RestConfig | SimConfig;
 }
 
 export interface TelemetrySample {
@@ -127,6 +159,22 @@ export interface SystemInfo {
   nodeVersion: string;
   platform: NodeJS.Platform;
   userDataDir: string;
+  /**
+   * desktop = Electron app, demo = public web demo (simulator only, private
+   * session per visitor), server = self-hosted web backend.
+   */
+  mode?: "desktop" | "demo" | "server";
+  /** Connection kinds the backend accepts. */
+  allowedKinds?: ConnectionKind[];
+}
+
+/** Notice raised by an adapter (e.g. safety trip) → written to the audit log. */
+export interface AdapterNotice {
+  level: "info" | "warning" | "alarm";
+  action: string;
+  /** Human-readable explanation (German), shown in the audit log. */
+  message: string;
+  details?: Record<string, unknown>;
 }
 
 export interface WriteRequest {

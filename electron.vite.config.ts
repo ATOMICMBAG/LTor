@@ -34,9 +34,14 @@ export default defineConfig({
   },
   renderer: {
     root: "src/renderer",
+    assetsInclude: ["**/*.glb"],
     plugins: [react()],
     build: {
       outDir: "out/renderer",
+      // Electron loads the renderer from file://, where fetch() of a file
+      // URL is not allowed – embed the 3D model as data URL instead.
+      assetsInlineLimit: (file: string) =>
+        file.endsWith(".glb") ? true : undefined,
       rollupOptions: {
         input: resolve(__dirname, "src/renderer/index.html"),
       },

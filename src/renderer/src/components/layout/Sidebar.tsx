@@ -5,6 +5,7 @@ import {
   Camera,
   FileText,
   ChevronLeft,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { useAppStore, type ModuleId } from "../../store/appStore";
@@ -23,6 +24,12 @@ const NAV: NavItem[] = [
     label: "Übersicht",
     icon: LayoutDashboard,
     hint: "Status",
+  },
+  {
+    id: "laserlab",
+    label: "Laserlabor",
+    icon: Zap,
+    hint: "3D-Simulator · Lernen",
   },
   { id: "telemetry", label: "Telemetrie", icon: Activity, hint: "Live-Daten" },
   {
@@ -79,7 +86,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="px-3 py-2 text-[10px] text-ltor-mute border-t border-ltor-line">
-        v0.1 · Phase 1+2
+        v0.2 · Laserlabor
       </div>
     </aside>
   );

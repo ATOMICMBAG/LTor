@@ -42,11 +42,37 @@ type StatusListener = (e: {
   error?: string;
 }) => void;
 
-export function createWebSocketTransport(url: string): LtorTransport {
+/** Requests made while the socket is (re)connecting wait this long. */
+const RPC_TIMEOUT_MS = 10_000;
+
+/**
+ * Per-tab session id: the public demo keeps one private session per id, so a
+ * page reload (same tab) resumes the same simulated lab.
+ */
+function sessionId(): string {
+  const fresh = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto ?
+      crypto.randomUUID()
+    : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  try {
+    const existing = sessionStorage.getItem("ltor.sid");
+    if (existing) return existing;
+    const id = fresh();
+    sessionStorage.setItem("ltor.sid", id);
+    return id;
+  } catch {
+    return fresh();
+  }
+}
+
+export function createWebSocketTransport(baseUrl: string): LtorTransport {
+  const url = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}sid=${encodeURIComponent(sessionId())}`;
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectDelay = 500;
   const pending = new Map<string, RpcCall>();
+  /** Serialized requests waiting for the socket to open. */
+  const outbox: string[] = [];
   const auditListeners = new Set<(entry: AuditEntry) => void>();
   const statusListeners = new Set<StatusListener>();
   const telemetryListeners = new Set<(sample: TelemetrySample) => void>();
@@ -67,10 +93,13 @@ export function createWebSocketTransport(url: string): LtorTransport {
     }
     socket.addEventListener("open", () => {
       reconnectDelay = 500;
-      console.info(`[ltor:ws] connected → ${url}`);
+      console.info(`[ltor:ws] connected → ${baseUrl}`);
+      while (outbox.length > 0 && socket?.readyState === WebSocket.OPEN) {
+        socket.send(outbox.shift()!);
+      }
     });
     socket.addEventListener("close", () => {
-      console.warn(`[ltor:ws] disconnected from ${url}`);
+      console.warn(`[ltor:ws] disconnected from ${baseUrl}`);
       // Reject all pending requests so the UI doesn't hang forever.
       for (const [, call] of pending) {
         call.reject(new Error("WebSocket disconnected"));
@@ -143,16 +172,26 @@ export function createWebSocketTransport(url: string): LtorTransport {
 
   function rpc<T>(method: string, ...params: unknown[]): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        reject(new Error("WebSocket not connected"));
-        return;
-      }
       const id = newId();
+      const frame = JSON.stringify({ id, method, params });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        const queued = outbox.indexOf(frame);
+        if (queued >= 0) outbox.splice(queued, 1);
+        reject(new Error("Backend nicht erreichbar (Zeitüberschreitung)"));
+      }, RPC_TIMEOUT_MS);
       pending.set(id, {
-        resolve: (v) => resolve(v as T),
-        reject,
+        resolve: (v) => {
+          clearTimeout(timer);
+          resolve(v as T);
+        },
+        reject: (e) => {
+          clearTimeout(timer);
+          reject(e);
+        },
       });
-      socket.send(JSON.stringify({ id, method, params }));
+      if (socket && socket.readyState === WebSocket.OPEN) socket.send(frame);
+      else outbox.push(frame);
     });
   }
 

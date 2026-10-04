@@ -6,7 +6,9 @@ import type {
   MqttConfig,
   RestConfig,
   RestPoll,
+  SimConfig,
 } from "@shared/types";
+import { LASER_MODELS, LASER_MODEL_IDS, type LaserModelId } from "@shared/laserPhysics";
 import { Save } from "lucide-react";
 import { ipc } from "../../ipc";
 
@@ -41,6 +43,8 @@ function defaultConfig(kind: ConnectionKind): Connection["config"] {
         method: "GET",
         polling: [{ path: "/api/sensor", intervalMs: 1000, channel: "sensor" }],
       } satisfies RestConfig;
+    case "sim":
+      return { model: "dpss532", sampleRateHz: 5, noise: 0.3 } satisfies SimConfig;
   }
 }
 
@@ -118,6 +122,12 @@ export function ConnectionForm({ initial, kind, onSaved, onCancel }: Props) {
           onChange={(v) => setConfig(v)}
         />
       )}
+      {kind === "sim" && (
+        <SimFields
+          value={config as SimConfig}
+          onChange={(v) => setConfig(v)}
+        />
+      )}
 
       {error && (
         <div className="text-sm text-ltor-alarm bg-red-50 border border-ltor-alarm/50 p-2">
@@ -143,6 +153,7 @@ function defaultName(kind: ConnectionKind) {
       opcua: "Neue OPC-UA-Verbindung",
       mqtt: "Neue MQTT-Verbindung",
       rest: "Neue REST-Verbindung",
+      sim: "Laserlabor · Simulator",
     } as const
   )[kind];
 }
@@ -429,6 +440,74 @@ function RestFields({
           })
         }
       />
+    </div>
+  );
+}
+
+// ---------- Laser-Simulator ----------
+function SimFields({
+  value,
+  onChange,
+}: {
+  value: SimConfig;
+  onChange: (v: SimConfig) => void;
+}) {
+  const model = LASER_MODELS[value.model] ?? LASER_MODELS.dpss532;
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="label">Lasermodell</label>
+        <select
+          className="input"
+          value={value.model}
+          onChange={(e) =>
+            onChange({ ...value, model: e.target.value as LaserModelId })
+          }
+        >
+          {LASER_MODEL_IDS.map((id) => (
+            <option key={id} value={id}>
+              {LASER_MODELS[id].name} · {LASER_MODELS[id].medium}
+            </option>
+          ))}
+        </select>
+        <div className="text-[10px] text-ltor-mute mt-1">
+          {model.description}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="label">Telemetrie-Rate (Hz)</label>
+          <input
+            type="number"
+            min={1}
+            max={10}
+            className="input-mono"
+            value={value.sampleRateHz ?? 5}
+            onChange={(e) =>
+              onChange({ ...value, sampleRateHz: Number(e.target.value) })
+            }
+          />
+        </div>
+        <div>
+          <label className="label">Messrauschen (0 … 1)</label>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.1}
+            className="input-mono"
+            value={value.noise ?? 0.3}
+            onChange={(e) =>
+              onChange({ ...value, noise: Number(e.target.value) })
+            }
+          />
+        </div>
+      </div>
+      <div className="text-[10px] text-ltor-mute">
+        Der Simulator öffnet keine Netzwerkverbindung. Bedienung und
+        3D-Ansicht im Modul „Laserlabor“; schreibbare Kanäle:
+        current_set_mA, tec_set_C, emission, shutter, interlock, fault_reset.
+      </div>
     </div>
   );
 }

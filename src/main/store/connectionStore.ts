@@ -11,17 +11,23 @@ interface PersistShape {
 
 /**
  * Persists connection profiles (without runtime status) to a JSON file
- * in the userData directory.
+ * in the userData directory. With `filePath = null` the store lives in
+ * memory only (one private store per visitor of the web demo).
  */
 export class ConnectionStore {
-  private readonly filePath: string;
+  private readonly filePath: string | null;
   private data: PersistShape = { version: 1, connections: [] };
 
-  constructor(filePath: string) {
+  constructor(filePath: string | null) {
     this.filePath = filePath;
   }
 
+  get size(): number {
+    return this.data.connections.length;
+  }
+
   async init(): Promise<void> {
+    if (!this.filePath) return;
     await fs.mkdir(dirname(this.filePath), { recursive: true });
     if (!existsSync(this.filePath)) {
       await this.persist();
@@ -111,6 +117,7 @@ export class ConnectionStore {
   }
 
   private async persist(): Promise<void> {
+    if (!this.filePath) return;
     // Strip volatile fields before persisting
     const sanitized: PersistShape = {
       version: 1,

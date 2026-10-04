@@ -20,6 +20,8 @@ import { ConnectionsModule } from "./modules/connections/ConnectionsModule";
 import { TelemetryModule } from "./modules/telemetry/TelemetryModule";
 import { SensorHubModule } from "./modules/sensors/SensorHubModule";
 import { AuditLogModule } from "./modules/audit/AuditLogModule";
+import { LaserLabModule } from "./modules/laserlab/LaserLabModule";
+import { useSystemStore } from "./store/systemStore";
 
 export default function App() {
   const activeModule = useAppStore((s) => s.activeModule);
@@ -34,13 +36,15 @@ export default function App() {
   const ingestTelemetry = useTelemetryStore((s) => s.ingest);
 
   const refreshDevices = useSensorsStore((s) => s.refreshDevices);
+  const loadSystem = useSystemStore((s) => s.load);
 
   // Bootstrap
   useEffect(() => {
+    void loadSystem();
     void refreshConnections();
     void refreshAudit(500);
     void refreshDevices();
-  }, [refreshConnections, refreshAudit, refreshDevices]);
+  }, [loadSystem, refreshConnections, refreshAudit, refreshDevices]);
 
   // Subscribe to live IPC events
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function App() {
         <main className="flex-1 min-w-0 min-h-0 flex flex-col bg-neutral-50 border-l border-r border-ltor-line overflow-hidden">
           <div className="flex-1 min-h-0 overflow-auto">
             {activeModule === "dashboard" && <DashboardModule />}
+            {activeModule === "laserlab" && <LaserLabModule />}
             {activeModule === "connections" && <ConnectionsModule />}
             {activeModule === "telemetry" && <TelemetryModule />}
             {activeModule === "sensors" && <SensorHubModule />}

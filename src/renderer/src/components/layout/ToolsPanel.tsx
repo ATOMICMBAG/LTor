@@ -125,9 +125,17 @@ function SystemInfoCard() {
   if (!info) return null;
   return (
     <div className="text-[11px] font-mono text-ltor-mute space-y-0.5">
-      <div>
-        Electron <span className="text-ltor-ink">{info.electronVersion}</span>
-      </div>
+      {info.electronVersion ?
+        <div>
+          Electron <span className="text-ltor-ink">{info.electronVersion}</span>
+        </div>
+      : <div>
+          Backend{" "}
+          <span className="text-ltor-ink">
+            {info.mode === "demo" ? "Web-Demo" : "Server"} v{info.appVersion}
+          </span>
+        </div>
+      }
       <div>
         Node <span className="text-ltor-ink">{info.nodeVersion}</span>
       </div>

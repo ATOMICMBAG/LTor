@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { ipc } from "../ipc";
 
 export type ModuleId =
   | "dashboard"
+  | "laserlab"
   | "telemetry"
   | "connections"
   | "sensors"
@@ -25,13 +27,16 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  activeModule: "dashboard",
+  // The web version opens straight into the Laserlabor; the desktop app
+  // starts with the overview of real devices.
+  activeModule: ipc.mode === "electron" ? "dashboard" : "laserlab",
   setActiveModule: (m) => set({ activeModule: m }),
   panels: {
     title: true,
     sidebar: true,
     status: true,
-    tools: true,
+    // Web: give the Laserlabor the full width; the tools stay one click away.
+    tools: ipc.mode === "electron",
   },
   togglePanel: (k) =>
     set((s) => ({ panels: { ...s.panels, [k]: !s.panels[k] } })),

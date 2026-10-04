@@ -1,20 +1,19 @@
 import type {
+  AdapterNotice,
   Connection,
   ConnectionStatus,
-  MqttConfig,
-  OpcUaConfig,
-  RestConfig,
   TelemetrySample,
 } from "@shared/types";
 import type { ProtocolAdapter } from "./adapter";
-import { OpcUaAdapter } from "./opcuaAdapter";
-import { MqttAdapter } from "./mqttAdapter";
-import { RestAdapter } from "./restAdapter";
+
+/** Builds the runtime adapter for a connection (see ./factory.ts). */
+export type AdapterFactory = (conn: Connection) => ProtocolAdapter;
 
 interface ManagedAdapter {
   adapter: ProtocolAdapter;
   unsubSample: () => void;
   unsubStatus: () => void;
+  unsubNotice: () => void;
 }
 
 /**
@@ -31,6 +30,11 @@ export class ProtocolManager {
     ) => void
   >();
   private sampleListeners = new Set<(sample: TelemetrySample) => void>();
+  private noticeListeners = new Set<
+    (connectionId: string, notice: AdapterNotice) => void
+  >();
+
+  constructor(private readonly buildAdapter: AdapterFactory) {}
 
   onStatus(
     fn: (
@@ -46,6 +50,12 @@ export class ProtocolManager {
     this.sampleListeners.add(fn);
     return () => this.sampleListeners.delete(fn);
   }
+  onNotice(
+    fn: (connectionId: string, notice: AdapterNotice) => void,
+  ): () => void {
+    this.noticeListeners.add(fn);
+    return () => this.noticeListeners.delete(fn);
+  }
 
   async connect(conn: Connection): Promise<void> {
     // Disconnect existing if reconnecting with new config
@@ -59,7 +69,16 @@ export class ProtocolManager {
     const unsubStatus = adapter.onStatus((status, error) => {
       for (const fn of this.statusListeners) fn(conn.id, status, error);
     });
-    this.adapters.set(conn.id, { adapter, unsubSample, unsubStatus });
+    const unsubNotice =
+      adapter.onNotice?.((n) => {
+        for (const fn of this.noticeListeners) fn(conn.id, n);
+      }) ?? (() => undefined);
+    this.adapters.set(conn.id, {
+      adapter,
+      unsubSample,
+      unsubStatus,
+      unsubNotice,
+    });
 
     try {
       await adapter.connect();
@@ -68,6 +87,7 @@ export class ProtocolManager {
       this.adapters.delete(conn.id);
       unsubSample();
       unsubStatus();
+      unsubNotice();
       throw e;
     }
   }
@@ -80,6 +100,7 @@ export class ProtocolManager {
     } finally {
       managed.unsubSample();
       managed.unsubStatus();
+      managed.unsubNotice();
       this.adapters.delete(connectionId);
     }
   }
@@ -103,18 +124,7 @@ export class ProtocolManager {
     return this.adapters.has(connectionId);
   }
 
-  private buildAdapter(conn: Connection): ProtocolAdapter {
-    switch (conn.kind) {
-      case "opcua":
-        return new OpcUaAdapter(conn.id, conn.config as OpcUaConfig);
-      case "mqtt":
-        return new MqttAdapter(conn.id, conn.config as MqttConfig);
-      case "rest":
-        return new RestAdapter(conn.id, conn.config as RestConfig);
-      default:
-        throw new Error(
-          `Unknown connection kind: ${(conn as Connection).kind}`,
-        );
-    }
+  get activeCount(): number {
+    return this.adapters.size;
   }
 }

@@ -31,3 +31,29 @@ tsconfig.web.tsbuildinfo
 
 # package-lock.json
 package-lock.json
+# local tooling / runtime data
+.claude/
+ltor-data/
+
+# local working files (never in the repo)
+/ltor.blend
+ARCHIV/
+*.blend1
+
+# secrets & credentials – never commit
+.env*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*_ed25519*
+*.ppk
+known_hosts*
+
+# deploy artefacts
+ltor-release*/
+*.tgz
+deploy/*.local.*
