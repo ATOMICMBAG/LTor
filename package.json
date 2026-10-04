@@ -4,7 +4,7 @@
   "description": "maazi.de | LTor — Laser Tor. Universelle Laborplattform für Lasersysteme & optische Messtechnik.",
   "main": "out/main/index.js",
   "author": "maazi.de|LTor Project",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
