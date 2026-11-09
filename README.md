@@ -640,11 +640,8 @@ Bitte **nicht** als öffentliches Issue melden, sondern vertraulich über
 
 Copyright © 2026 [maazi.de](https://maazi.de)
 
-LTor ist freie Software: Du kannst sie unter den Bedingungen der
-**GNU General Public License, Version 3** (GPL-3.0), wie von der Free
-Software Foundation veröffentlicht, weitergeben und/oder verändern.
+**GNU General Public License, Version 3** (GPL-3.0)
 
-LTor wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede
-Gewährleistung** – sogar ohne die implizite Gewährleistung der
+LTor  **ohne jede Gewährleistung** – ! Sogar ohne die implizite Gewährleistung der
 Marktreife oder der Eignung für einen bestimmten Zweck. Details stehen im
 vollständigen Lizenztext in [LICENSE](LICENSE).
