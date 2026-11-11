@@ -86,7 +86,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="px-3 py-2 text-[10px] text-ltor-mute border-t border-ltor-line">
-        v0.2 · Laserlabor
+        v0.3 · Laserlabor
       </div>
     </aside>
   );

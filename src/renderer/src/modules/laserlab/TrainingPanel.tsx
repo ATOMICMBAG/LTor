@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { CheckCircle2, Circle, GraduationCap, ScrollText, Lightbulb, Box } from "lucide-react";
+import { CheckCircle2, Circle, GraduationCap, ScrollText, Lightbulb, Box, ShieldAlert } from "lucide-react";
 import {
   effectiveThresholdmA,
   laserClass,
@@ -14,14 +14,16 @@ import { ipc } from "../../ipc";
 import { EXERCISES, PARTS, describeAction, explainState, type LabPart } from "./knowledge";
 import { bool, num, str, type SimValues } from "./useSimFrame";
 
-export type TrainingTab = "now" | "exercises" | "log" | "part";
+export type TrainingTab = "now" | "exercises" | "log" | "part" | "safety";
 
 export interface OpticsState {
-  lensInPath: boolean;
-  /** Focus position and Rayleigh range after the lens [m] (undefined w/o lens). */
-  focusZ?: number;
-  focusZR?: number;
+  lensCount: number;
+  /** Real foci behind the lenses: position and Rayleigh range [m]. */
+  foci: { z: number; zR: number }[];
   planeZ: number;
+  /** Waist ratio output/input and Rayleigh range of the output beam [m]. */
+  magnification: number;
+  outZR: number;
 }
 
 function storageKey(modelId: string) {
@@ -123,16 +125,19 @@ export function useExerciseTracker(opts: {
     } else {
       tunedSince.current = null;
     }
-    // 5) focus measured
-    if (
-      optics.lensInPath &&
-      optics.focusZ !== undefined &&
-      optics.focusZR !== undefined &&
-      shutter &&
-      num(v, "power_mW") > 0 &&
-      Math.abs(optics.planeZ - optics.focusZ) <= optics.focusZR
-    ) {
+    const beamOn = shutter && num(v, "power_mW") > 0;
+    // 5) focus measured: measurement plane within ±z_R of a real focus
+    if (beamOn && optics.foci.some((f) => Math.abs(optics.planeZ - f.z) <= f.zR)) {
       complete("focus");
+    }
+    // 6) beam expander: ≥ 2 lenses, collimated output, expanded or reduced ≥ 1.8×
+    if (
+      beamOn &&
+      optics.lensCount >= 2 &&
+      optics.outZR > 2 &&
+      (optics.magnification >= 1.8 || optics.magnification <= 1 / 1.8)
+    ) {
+      complete("telescope");
     }
     // 7) safe stop: emission switched off with shutter closed and current ramped down
     if (p["emission"] === true && !emission && !shutter && num(p, "current_mA") < 0.01 * model.maxCurrentmA) {
@@ -140,7 +145,7 @@ export function useExerciseTracker(opts: {
     }
     prev.current = { ...v };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [v, optics.lensInPath, optics.planeZ, optics.focusZ, optics.focusZR]);
+  }, [v, optics]);
 
   return { done, complete };
 }
@@ -228,6 +233,11 @@ export function TrainingPanel(props: {
   done: Set<string>;
   onQuizCorrect: () => void;
   part: LabPart | null;
+  /** Extra details for the selected part (e.g. the clicked lens). */
+  partExtra?: ReactNode;
+  /** Shown in the "Bauteil" tab when nothing is selected. */
+  laserInfo: ReactNode;
+  safety: ReactNode;
 }) {
   const { model, v } = props;
   const entries = useAuditStore((s) => s.entries);
@@ -260,10 +270,11 @@ export function TrainingPanel(props: {
   const firstOpen = exercises.find((e) => !props.done.has(e.id));
 
   const tabs: { id: TrainingTab; label: string; icon: JSX.Element }[] = [
-    { id: "now", label: "Was passiert?", icon: <Lightbulb size={12} /> },
+    { id: "now", label: "Jetzt", icon: <Lightbulb size={12} /> },
     { id: "exercises", label: `Übungen ${doneCount}/${exercises.length}`, icon: <GraduationCap size={12} /> },
     { id: "log", label: "Protokoll", icon: <ScrollText size={12} /> },
     { id: "part", label: "Bauteil", icon: <Box size={12} /> },
+    { id: "safety", label: "Laserschutz", icon: <ShieldAlert size={12} /> },
   ];
 
   return (
@@ -274,7 +285,7 @@ export function TrainingPanel(props: {
             key={t.id}
             onClick={() => props.onTab(t.id)}
             className={clsx(
-              "flex-1 flex items-center justify-center gap-1 px-2 py-2 text-[11px] border-b-2 -mb-px",
+              "flex-1 flex items-center justify-center gap-1 px-1 py-2 text-[11px] whitespace-nowrap border-b-2 -mb-px",
               props.tab === t.id ? "border-ltor-ink font-semibold" : "border-transparent text-ltor-mute hover:text-ltor-ink",
             )}
           >
@@ -349,10 +360,13 @@ export function TrainingPanel(props: {
           </div>
         )}
 
+        {props.tab === "safety" && props.safety}
+
         {props.tab === "part" &&
           (props.part ?
             <div className="space-y-2">
               <div className="text-sm font-semibold">{PARTS[props.part].title}</div>
+              {props.partExtra}
               <p>{PARTS[props.part].what}</p>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-ltor-mute">Physik</div>
@@ -363,7 +377,10 @@ export function TrainingPanel(props: {
                 <p>{PARTS[props.part].practice}</p>
               </div>
             </div>
-          : <div className="text-ltor-mute">Klicke im 3D-Bild auf ein Bauteil.</div>)}
+          : <div className="space-y-2">
+              <div className="text-ltor-mute">Klicke im 3D-Bild auf ein Bauteil. Bis dahin: der Laser selbst.</div>
+              {props.laserInfo}
+            </div>)}
       </div>
     </div>
   );

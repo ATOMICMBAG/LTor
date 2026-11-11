@@ -3,9 +3,10 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { radiusAt, type BeamSegment } from "@shared/laserPhysics";
+import { lensRadiiMm, radiusAt, type BeamSegment, type LensShape } from "@shared/laserPhysics";
 import labModelUrl from "../../assets/ltor_lab.glb";
 import { PARTS, type LabPart } from "./knowledge";
+import { describeLens, lensLabel, type BenchLens } from "./optics";
 
 /** Geometry conventions shared with assets/blender/build_ltor_lab.py. */
 export const BENCH = {
@@ -14,8 +15,6 @@ export const BENCH = {
   /** Absorber surface of the power meter, measured from the aperture [m]. */
   end: 0.65,
   shutterZ: 0.012,
-  lensMin: 0.04,
-  lensMax: 0.6,
   planeMin: 0.005,
   planeMax: 0.645,
 };
@@ -34,23 +33,61 @@ export interface LabSceneProps {
   shutterOpen: boolean;
   /** LED: "off" | "blink" | "on". */
   led: "off" | "blink" | "on";
-  lensInPath: boolean;
-  lensZ: number;
+  /** Lens chain on the rail. */
+  lenses: BenchLens[];
   planeZ: number;
-  onSelect: (part: LabPart) => void;
-  onLensMove: (z: number) => void;
+  onSelect: (part: LabPart, lensId?: string) => void;
+  onLensMove: (id: string, z: number) => void;
   onPlaneMove: (z: number) => void;
   onDragEnd: (what: "lens" | "plane") => void;
 }
 
-type DragTarget = "lens" | "plane";
+type DragTarget = { kind: "lens"; id: string } | { kind: "plane" };
 
-function partOf(obj: THREE.Object3D | null): LabPart | null {
+function partOf(obj: THREE.Object3D | null): { part: LabPart; lensId?: string } | null {
+  let part: LabPart | null = null;
+  let lensId: string | undefined;
   for (let o = obj; o; o = o.parent) {
     const p = o.userData?.["ltor_part"];
-    if (typeof p === "string" && p in PARTS) return p as LabPart;
+    if (!part && typeof p === "string" && p in PARTS) part = p as LabPart;
+    const id = o.userData?.["lensId"];
+    if (!lensId && typeof id === "string") lensId = id;
   }
-  return null;
+  return part ? { part, lensId } : null;
+}
+
+/** Clear radius of a 1-inch lens [mm]. */
+const LENS_RADIUS_MM = 12.5;
+
+/** Surface sag [mm] of a sphere with radius R at height r (∞ = plane). */
+function sag(R: number, r: number): number {
+  if (!Number.isFinite(R)) return 0;
+  return Math.sign(R) * (Math.abs(R) - Math.sqrt(Math.max(0, R * R - r * r)));
+}
+
+/**
+ * Real lens geometry from the lensmaker radii (N-BK7): profile of both
+ * surfaces, revolved around the optical axis. Units: metres.
+ */
+function lensGeometry(shape: LensShape, focalMm: number): THREE.BufferGeometry {
+  const [r1, r2] = lensRadiiMm(shape, focalMm);
+  const rMax = LENS_RADIUS_MM;
+  // centre thickness: ≥ 1.5 mm, edge thickness ≥ 1.2 mm
+  const tc = Math.max(1.5, 1.2 - sag(r2, rMax) + sag(r1, rMax));
+  const n = 24;
+  const pts: THREE.Vector2[] = [];
+  for (let k = 0; k <= n; k++) {
+    const r = (rMax * k) / n;
+    pts.push(new THREE.Vector2(r / 1000, (-tc / 2 + sag(r1, r)) / 1000));
+  }
+  for (let k = n; k >= 0; k--) {
+    const r = (rMax * k) / n;
+    pts.push(new THREE.Vector2(r / 1000, (tc / 2 + sag(r2, r)) / 1000));
+  }
+  const geo = new THREE.LatheGeometry(pts, 48);
+  geo.rotateZ(-Math.PI / 2); // lathe axis (Y) → optical axis (X)
+  geo.computeVertexNormals();
+  return geo;
 }
 
 /** Lathe profile of the beam envelope along the bench (exaggerated radius). */
@@ -88,7 +125,7 @@ export function LabScene(props: LabSceneProps) {
     setBeam: (p: LabSceneProps) => void;
     setDynamic: (p: LabSceneProps) => void;
   } | null>(null);
-  const [hover, setHover] = useState<{ x: number; y: number; part: LabPart } | null>(null);
+  const [hover, setHover] = useState<{ x: number; y: number; part: LabPart; lensId?: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -198,7 +235,17 @@ export function LabScene(props: LabSceneProps) {
     bench.add(plane);
 
     // ---- glTF model ------------------------------------------------------
-    let lensMount: THREE.Object3D | null = null;
+    /** Lens mount from the glTF – cloned once per lens of the chain. */
+    let lensTemplate: THREE.Object3D | null = null;
+    let glassMat: THREE.Material = new THREE.MeshPhysicalMaterial({
+      color: "#eef6ff",
+      transmission: 1,
+      roughness: 0.05,
+      ior: 1.517,
+      thickness: 0.004,
+      side: THREE.DoubleSide,
+    });
+    const lensNodes = new Map<string, { root: THREE.Object3D; glass: THREE.Mesh; key: string }>();
     let shutter: THREE.Object3D | null = null;
     let shutterBaseY = 0;
     let ledMat: THREE.MeshStandardMaterial | null = null;
@@ -210,7 +257,15 @@ export function LabScene(props: LabSceneProps) {
       .then((gltf) => {
         if (disposed) return;
         scene.add(gltf.scene);
-        lensMount = gltf.scene.getObjectByName("LensMount") ?? null;
+        lensTemplate = gltf.scene.getObjectByName("LensMount") ?? null;
+        if (lensTemplate) {
+          lensTemplate.visible = false;
+          const glass = lensTemplate.getObjectByName("Lens") as THREE.Mesh | undefined;
+          if (glass?.material instanceof THREE.Material) {
+            glassMat = glass.material.clone();
+            glassMat.side = THREE.DoubleSide;
+          }
+        }
         shutter = gltf.scene.getObjectByName("Shutter") ?? null;
         shutterBaseY = shutter?.position.y ?? 0;
         const led = gltf.scene.getObjectByName("EmissionLED") as THREE.Mesh | undefined;
@@ -252,9 +307,36 @@ export function LabScene(props: LabSceneProps) {
         planeCircle.visible = visible && (p.shutterOpen || p.planeZ < BENCH.shutterZ);
       },
       setDynamic(p) {
-        if (lensMount) {
-          lensMount.visible = p.lensInPath;
-          lensMount.position.x = BENCH.apertureX + p.lensZ;
+        if (lensTemplate) {
+          const ids = new Set(p.lenses.map((l) => l.id));
+          for (const [id, node] of lensNodes) {
+            if (ids.has(id)) continue;
+            node.root.removeFromParent();
+            node.glass.geometry.dispose();
+            lensNodes.delete(id);
+          }
+          for (const l of p.lenses) {
+            let node = lensNodes.get(l.id);
+            if (!node) {
+              const root = lensTemplate.clone(true);
+              root.visible = true;
+              root.userData["lensId"] = l.id;
+              root.getObjectByName("Lens")?.removeFromParent();
+              const glass = new THREE.Mesh(new THREE.BufferGeometry(), glassMat);
+              glass.userData["ltor_part"] = "Lens";
+              root.add(glass);
+              scene.add(root);
+              node = { root, glass, key: "" };
+              lensNodes.set(l.id, node);
+            }
+            const key = `${l.shape}:${l.focalMm}`;
+            if (node.key !== key) {
+              node.glass.geometry.dispose();
+              node.glass.geometry = lensGeometry(l.shape, l.focalMm);
+              node.key = key;
+            }
+            node.root.position.x = BENCH.apertureX + l.z;
+          }
         }
         plane.position.x = p.planeZ;
       },
@@ -276,18 +358,21 @@ export function LabScene(props: LabSceneProps) {
       ray.setFromCamera(pointer, camera);
     }
 
-    function pick(): { part: LabPart | null; drag: DragTarget | null } {
-      const parts = ray
+    function pick(): { part: LabPart | null; lensId?: string; drag: DragTarget | null } {
+      const hits = ray
         .intersectObjects(scene.children, true)
         .filter((h) => h.object.visible)
         .map((h) => partOf(h.object))
-        .filter((p): p is LabPart => p !== null);
+        .filter((p): p is NonNullable<ReturnType<typeof partOf>> => p !== null);
       // The (transparent) beam must not hide the parts behind it: the first
       // solid part along the ray wins, the beam only if nothing else is hit.
-      const part = parts.find((p) => p !== "Beam") ?? parts[0] ?? null;
-      if (part === "Lens" && propsRef.current.lensInPath) return { part, drag: "lens" };
-      if (part === "Plane") return { part, drag: "plane" };
-      return { part, drag: null };
+      const first = hits.find((p) => p.part !== "Beam") ?? hits[0];
+      if (!first) return { part: null, drag: null };
+      if (first.part === "Lens" && first.lensId) {
+        return { part: "Lens", lensId: first.lensId, drag: { kind: "lens", id: first.lensId } };
+      }
+      if (first.part === "Plane") return { part: "Plane", drag: { kind: "plane" } };
+      return { part: first.part, drag: null };
     }
 
     const onDown = (ev: PointerEvent) => {
@@ -305,8 +390,8 @@ export function LabScene(props: LabSceneProps) {
       if (drag) {
         if (ray.ray.intersectPlane(benchPlane, hit)) {
           const z = hit.x - BENCH.apertureX;
-          if (drag === "lens") {
-            propsRef.current.onLensMove(Math.min(BENCH.lensMax, Math.max(BENCH.lensMin, z)));
+          if (drag.kind === "lens") {
+            propsRef.current.onLensMove(drag.id, z);
           } else {
             propsRef.current.onPlaneMove(Math.min(BENCH.planeMax, Math.max(BENCH.planeMin, z)));
           }
@@ -316,11 +401,11 @@ export function LabScene(props: LabSceneProps) {
       const p = pick();
       const r = renderer.domElement.getBoundingClientRect();
       renderer.domElement.style.cursor = p.drag ? "ew-resize" : p.part ? "pointer" : "grab";
-      setHover(p.part ? { x: ev.clientX - r.left, y: ev.clientY - r.top, part: p.part } : null);
+      setHover(p.part ? { x: ev.clientX - r.left, y: ev.clientY - r.top, part: p.part, lensId: p.lensId } : null);
     };
     const onUp = (ev: PointerEvent) => {
       if (drag) {
-        propsRef.current.onDragEnd(drag);
+        propsRef.current.onDragEnd(drag.kind);
         drag = null;
         controls.enabled = true;
         renderer.domElement.releasePointerCapture(ev.pointerId);
@@ -328,7 +413,7 @@ export function LabScene(props: LabSceneProps) {
       if (downAt && Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) < 4) {
         setPointer(ev);
         const p = pick();
-        if (p.part) propsRef.current.onSelect(p.part);
+        if (p.part) propsRef.current.onSelect(p.part, p.lensId);
       }
       downAt = null;
     };
@@ -402,7 +487,7 @@ export function LabScene(props: LabSceneProps) {
 
   useEffect(() => {
     api.current?.setDynamic(props);
-  }, [props.lensInPath, props.lensZ, props.planeZ]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props.lenses, props.planeZ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="relative w-full h-full">
@@ -412,7 +497,12 @@ export function LabScene(props: LabSceneProps) {
           className="pointer-events-none absolute z-10 px-2 py-1 text-[11px] bg-ltor-ink text-white whitespace-nowrap"
           style={{ left: hover.x + 12, top: hover.y + 12 }}
         >
-          {PARTS[hover.part].title}
+          {hover.part === "Lens" && hover.lensId ?
+            (() => {
+              const l = props.lenses.find((x) => x.id === hover.lensId);
+              return l ? `Linse ${lensLabel(props.lenses, l.id)} · ${describeLens(l)}` : PARTS.Lens.title;
+            })()
+          : PARTS[hover.part].title}
           {(hover.part === "Lens" || hover.part === "Plane") && " · ziehen zum Verschieben"}
         </div>
       )}

@@ -22,11 +22,14 @@ Webbrowser gegen einen Remote-Backend-Server (z. B. VPS) – siehe Abschnitt
 > fünf Lasertypen (405 nm GaN-Diode, 808 nm Hochleistungsdiode, 1550 nm DFB,
 > 1064 nm und 532 nm DPSS) mit Schwellstrom nach T₀-Gesetz, Eigenerwärmung,
 > Wellenlängendrift, Pumpabsorption und quadratischer Frequenzverdopplung.
-> Linse und Messebene lassen sich im 3D-Bild verschieben – Kaustik und
-> Strahlprofil folgen dem Gaußstrahl-Formalismus (ABCD/q-Parameter).
+> Bis zu fünf Linsen (bikonvex, plankonvex, Meniskus, Zerstreuungslinsen)
+> bilden auf der Schiene eine Linsenkette – Fokussierung, Kepler- und
+> Galilei-Teleskop, 4f-Relay. Linsen und Messebene lassen sich im 3D-Bild
+> verschieben; Kaustik und Strahlprofil folgen dem Gaußstrahl-Formalismus
+> (ABCD/q-Parameter).
 > Laserklasse, MPE, NOHD und Schutzbrillen-OD werden live berechnet.
 > Für **Auszubildende und angehende Laserfachkräfte** erklärt das Labor jeden
-> Zustand, prüft sieben Übungen automatisch und protokolliert jeden Schritt.
+> Zustand, prüft acht Übungen automatisch und protokolliert jeden Schritt.
 > Details: [Laserlabor](#laserlabor-neu-in-v02).
 
 [![Laserlabor](/media/6_laserlabor.jpg)](https://ltor.maazi.de)
@@ -145,8 +148,16 @@ Audit-Log funktionieren genau wie bei OPC UA, MQTT oder REST.
 - Interlock öffnen schaltet die Emission sofort ab – **kein automatischer
   Wiederanlauf**. Übertemperatur der Sperrschicht löst eine
   Schutzabschaltung aus, die quittiert werden muss.
-- Im 3D-Bild: ziehen = drehen, Rad = Zoom, **Linse und Messebene entlang der
+- Im 3D-Bild: ziehen = drehen, Rad = Zoom, **Linsen und Messebene entlang der
   Schiene ziehen**, Bauteil anklicken = Erklärung (Funktion, Physik, Praxis).
+- **Linsenkette** (Reiter „Optik“): bis zu fünf Linsen mit Form
+  (bikonvex, plankonvex, Meniskus, bikonkav, plankonkav) und Brennweite;
+  Vorlagen für Fokussierung, Kepler- und Galilei-Teleskop und 4f-Relay.
+  Die 3D-Linsen haben die echte Geometrie aus der Linsenmacher-Gleichung
+  (N-BK7, Ø 1″); Warnung, wenn der Strahl die Linsenapertur überschreitet.
+- Alles auf einer Seite: 3D-Bank und Diagramme links, rechts „Steuerung“
+  (Laser · Optik) und der Hilfebereich (Jetzt · Übungen · Protokoll ·
+  Bauteil · Laserschutz) – kein Scrollen beim Justieren.
 
 **Physik (Lehrmodell, Formeln im Code dokumentiert)**
 
@@ -159,7 +170,8 @@ Audit-Log funktionieren genau wie bei OPC UA, MQTT oder REST.
 | DPSS-Pumpabsorption       | Lorentz-Linie Nd:YVO₄ bei 808,5 nm, FWHM 2,5 nm                |
 | Frequenzverdopplung (SHG) | P₅₃₂ = k·P₁₀₆₄²                                                |
 | Gaußstrahl                | z_R = π·w₀²/(M²·λ), w(z) = w₀·√(1 + (z/z_R)²)                  |
-| Dünne Linse               | 1/q′ = 1/q − 1/f (komplexer Strahlparameter)                   |
+| Linsenkette               | 1/q′ = 1/q − 1/f, Linse für Linse (komplexer Strahlparameter)  |
+| Linsenform                | 1/f = (n − 1)(1/R₁ − 1/R₂), N-BK7 n = 1,5168                   |
 | Laserschutz               | AEL/Klasse, MPE, NOHD, OD nach IEC 60825-1 (vereinfacht, CW)   |
 
 `npm run test:physics` prüft die Formeln gegen Lehrbuchwerte.
@@ -168,10 +180,10 @@ Audit-Log funktionieren genau wie bei OPC UA, MQTT oder REST.
 
 - **Was passiert?** – erklärt den aktuellen Zustand (unter/über der Schwelle,
   Shutter, Absorption, Temperaturgrenze …) in Klartext.
-- **Übungen** – sieben Aufgaben, die automatisch erkannt werden: sicher
+- **Übungen** – acht Aufgaben, die automatisch erkannt werden: sicher
   einschalten, Laserschwelle finden, Temperatureinfluss, Pumpwellenlänge
-  abstimmen (DPSS), fokussieren & vermessen, Laserklasse/Schutzbrille (Quiz),
-  sicher ausschalten.
+  abstimmen (DPSS), fokussieren & vermessen, Strahl aufweiten (Teleskop),
+  Laserklasse/Schutzbrille (Quiz), sicher ausschalten.
 - **Protokoll** – jede Aktion und jede Gerätemeldung mit Erklärung; der
   Fortschritt landet zusätzlich im Audit-Log (exportierbar als JSONL).
 

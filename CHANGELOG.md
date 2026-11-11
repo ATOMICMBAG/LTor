@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.3.0 — Linsenkette & Ein-Seiten-Layout
+
+### Neu
+
+- **Linsenkette:** bis zu fünf Linsen auf der optischen Schiene, einzeln im
+  3D-Bild verschiebbar (ohne sich zu überholen). Formen bikonvex,
+  plankonvex, Meniskus sowie Zerstreuungslinsen (bikonkav, plankonkav,
+  Meniskus); Brennweiten 25–300 mm, nur physikalisch fertigbare
+  Kombinationen.
+- Echte 3D-Linsengeometrie aus der Linsenmacher-Gleichung (N-BK7, Ø 1″),
+  Radien R₁/R₂ in der Oberfläche, Aperturwarnung bei zu großem Strahl.
+- Vorlagen: Fokussieren, Kepler-Teleskop 1:3, Galilei-Teleskop 1:3,
+  4f-Relay, leere Bank.
+- Strahlrechnung Linse für Linse (q-Parameter): alle reellen Foki,
+  Ausgangsstrahl, Taillenverhältnis, Kollimationserkennung.
+- Übung „Strahl aufweiten (Teleskop)“, Physik-Selbsttest für Kepler,
+  Galilei und Linsenmacher-Gleichung.
+
+### Geändert
+
+- **Laserlabor passt auf eine Seite:** „Optik auf der Bank“ ist ein Reiter
+  der Kachel „Steuerung“, „Laserschutz“ und „Über diesen Laser“ sind Teil
+  des Hilfebereichs. 3D-Ansicht und Diagramme bleiben beim Justieren
+  sichtbar.
+
 ## v0.2.0 — Laserlabor & Online-Demo
 
 ### Neu

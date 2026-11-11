@@ -449,27 +449,120 @@ export function throughThinLens(
 }
 
 /**
- * Beam path on the bench: laser aperture at z = 0, optional thin lens.
- * Returns segments before and after the lens.
+ * Beam path on the bench: laser aperture at z = 0, followed by any number of
+ * thin lenses (a lens chain). The beam parameter is propagated from lens to
+ * lens; the result has one segment per gap (n lenses → n + 1 segments).
+ * Focal lengths are signed: f > 0 converging, f < 0 diverging.
  */
 export function benchBeam(opts: {
   w0: number;
   lambda: number;
   m2: number;
-  lens?: { z: number; focal: number };
+  lenses?: { z: number; focal: number }[];
   zEnd: number;
 }): BeamSegment[] {
   const lambdaEff = opts.lambda * opts.m2;
   const zR0 = (Math.PI * opts.w0 * opts.w0) / lambdaEff;
-  const first = { w0: opts.w0, zWaist: 0, zR: zR0 };
-  if (!opts.lens || opts.lens.z <= 0 || opts.lens.z >= opts.zEnd) {
-    return [{ zStart: 0, zEnd: opts.zEnd, ...first }];
+  let current = { w0: opts.w0, zWaist: 0, zR: zR0 };
+  let zStart = 0;
+  const out: BeamSegment[] = [];
+  const lenses = (opts.lenses ?? [])
+    .filter((l) => l.z > 0 && l.z < opts.zEnd && l.focal !== 0)
+    .sort((a, b) => a.z - b.z);
+  for (const lens of lenses) {
+    out.push({ zStart, zEnd: lens.z, ...current });
+    current = throughThinLens(current, lens.z, lens.focal, lambdaEff);
+    zStart = lens.z;
   }
-  const second = throughThinLens(first, opts.lens.z, opts.lens.focal, lambdaEff);
-  return [
-    { zStart: 0, zEnd: opts.lens.z, ...first },
-    { zStart: opts.lens.z, zEnd: opts.zEnd, ...second },
-  ];
+  out.push({ zStart, zEnd: opts.zEnd, ...current });
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Lens shapes (paraxial: only f matters for the beam; the shape sets the
+// radii via the lensmaker's equation and governs aberrations)
+// ---------------------------------------------------------------------------
+
+export type LensShape =
+  | "biconvex"
+  | "planoconvex"
+  | "meniscus_pos"
+  | "biconcave"
+  | "planoconcave"
+  | "meniscus_neg";
+
+export const LENS_SHAPES: Record<
+  LensShape,
+  { name: string; converging: boolean; note: string }
+> = {
+  biconvex: {
+    name: "bikonvex",
+    converging: true,
+    note: "Symmetrisch – am besten für Abbildung 1:1 (Objekt- und Bildweite ≈ 2f).",
+  },
+  planoconvex: {
+    name: "plankonvex",
+    converging: true,
+    note:
+      "Gekrümmte Seite zum kollimierten Strahl drehen: so ist die sphärische " +
+      "Aberration beim Fokussieren am kleinsten.",
+  },
+  meniscus_pos: {
+    name: "Meniskus (konkav-konvex)",
+    converging: true,
+    note:
+      "Beide Flächen gleichsinnig gekrümmt. Minimiert zusammen mit einer " +
+      "Plankonvexlinse die Aberration bei sehr kleinen Fokussen.",
+  },
+  biconcave: {
+    name: "bikonkav",
+    converging: false,
+    note: "Zerstreuungslinse (f < 0): weitet den Strahl auf – z. B. im Galilei-Teleskop.",
+  },
+  planoconcave: {
+    name: "plankonkav",
+    converging: false,
+    note: "Zerstreuungslinse mit einer ebenen Fläche – häufig in Strahlaufweitern.",
+  },
+  meniscus_neg: {
+    name: "Meniskus (konvex-konkav)",
+    converging: false,
+    note: "Zerstreuender Meniskus: der Rand ist dicker als die Mitte.",
+  },
+};
+
+/** Refractive index of N-BK7 (≈ 587 nm). */
+export const N_BK7 = 1.5168;
+
+/**
+ * Surface radii R₁, R₂ [mm] from the lensmaker's equation (thin lens)
+ *   1/f = (n − 1) · (1/R₁ − 1/R₂)
+ * Sign convention: R > 0 if the centre of curvature lies behind the surface
+ * (in beam direction). Infinity = plane surface.
+ */
+export function lensRadiiMm(shape: LensShape, focalMm: number, n = N_BK7): [number, number] {
+  const f = Math.abs(focalMm);
+  const k = n - 1;
+  switch (shape) {
+    case "biconvex":
+      return [2 * k * f, -2 * k * f];
+    case "planoconvex":
+      return [k * f, Infinity];
+    case "meniscus_pos":
+      // R₂ = 3·R₁ (same sign): 1/f = k·(2/(3R₁))
+      return [(2 * k * f) / 3, 2 * k * f];
+    case "biconcave":
+      return [-2 * k * f, 2 * k * f];
+    case "planoconcave":
+      return [Infinity, k * f];
+    case "meniscus_neg":
+      return [2 * k * f, (2 * k * f) / 3];
+  }
+}
+
+/** Can this shape be made with that focal length at the given clear radius? */
+export function lensFeasible(shape: LensShape, focalMm: number, apertureRadiusMm = 12.7): boolean {
+  return lensRadiiMm(shape, focalMm).every((r) => !Number.isFinite(r) || Math.abs(r) > apertureRadiusMm * 1.02);
 }
 
 /** Beam radius at position z on the bench [m]. */

@@ -111,11 +111,12 @@ export function PiChart(props: {
 export function CausticChart(props: {
   segments: BeamSegment[];
   zEnd: number;
-  lensZ?: number;
+  /** Lens positions [m], in order along the bench. */
+  lensZs: number[];
   planeZ: number;
 }) {
   const data = useMemo(() => {
-    const n = 160;
+    const n = 320;
     const out: { z: number; w: number }[] = [];
     for (let k = 0; k <= n; k++) {
       const z = (props.zEnd * k) / n;
@@ -163,13 +164,14 @@ export function CausticChart(props: {
               contentStyle={{ fontSize: 11, fontFamily: "monospace" }}
             />
             <Line dataKey="w" stroke={INK} dot={false} strokeWidth={2} isAnimationActive={false} />
-            {props.lensZ !== undefined && (
+            {props.lensZs.map((z, i) => (
               <ReferenceLine
-                x={props.lensZ * 1000}
+                key={i}
+                x={z * 1000}
                 stroke="#737373"
-                label={{ value: "Linse", position: "top", fontSize: 10, fill: "#737373" }}
+                label={{ value: `L${i + 1}`, position: "top", fontSize: 10, fill: "#737373" }}
               />
-            )}
+            ))}
             <ReferenceLine
               x={props.planeZ * 1000}
               stroke="#2563eb"
@@ -254,8 +256,8 @@ export function BeamProfile(props: {
     <div className="h-full flex flex-col">
       <div className="text-[10px] text-ltor-mute px-1">Strahlprofil an der Messebene</div>
       <div className="flex-1 min-h-0 flex gap-3 items-center px-1">
-        <canvas ref={canvas} width={128} height={128} className="w-[150px] h-[150px] shrink-0 border border-ltor-line" />
-        <div className="text-[11px] font-mono space-y-0.5 min-w-[140px] flex-1">
+        <canvas ref={canvas} width={128} height={128} className="w-[110px] h-[110px] 2xl:w-[150px] 2xl:h-[150px] shrink-0 border border-ltor-line" />
+        <div className="text-[11px] font-mono space-y-0.5 min-w-0 flex-1 break-words">
           <div>
             <span className="text-ltor-mute">w (1/e²) </span>
             {props.w < 1e-3 ? `${fmt(props.w * 1e6, 1)} µm` : `${fmt(props.w * 1e3, 2)} mm`}

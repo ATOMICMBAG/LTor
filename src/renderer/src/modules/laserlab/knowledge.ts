@@ -100,12 +100,15 @@ export const PARTS: Record<LabPart, PartInfo> = {
     practice: "Ziehe die Linse im 3D-Bild entlang der Schiene oder nutze den Regler.",
   },
   Lens: {
-    title: "Sammellinse (N-BK7, plankonvex/bikonvex)",
-    what: "Fokussiert den Strahl. Brennweite f wählbar.",
+    title: "Linse (N-BK7, Ø 1″)",
+    what:
+      "Bis zu fünf Linsen bilden eine Kette auf der Schiene: Sammellinsen (bikonvex, " +
+      "plankonvex, Meniskus) und Zerstreuungslinsen. Form und Brennweite im Reiter „Optik“.",
     physics:
       "Gaußstrahl durch dünne Linse: 1/q′ = 1/q − 1/f mit dem komplexen Strahlparameter " +
-      "q = z + i·z_R. Für einen kollimierten Strahl gilt w₀′ ≈ M²·λ·f / (π·w_L). Kurze " +
-      "Brennweite → kleiner Fokus, aber kurze Rayleigh-Länge (geringe Schärfentiefe).",
+      "q = z + i·z_R – Linse für Linse nacheinander angewendet. Für einen kollimierten " +
+      "Strahl gilt w₀′ ≈ M²·λ·f / (π·w_L). Die Form folgt aus der Linsenmacher-Gleichung " +
+      "1/f = (n − 1)(1/R₁ − 1/R₂); sie ändert f nicht, aber die Abbildungsfehler.",
     practice:
       "Im Fokus ist die Leistungsdichte um Größenordnungen höher – Brandgefahr! Linse nur " +
       "bei geschlossenem Shutter verschieben.",
@@ -245,6 +248,17 @@ export const EXERCISES: Exercise[] = [
     hint:
       "Im Fokus ist der Radius minimal: w₀′. Innerhalb ±z_R′ wächst er höchstens um den " +
       "Faktor √2. Vergleiche w₀′ mit der Formel M²·λ·f/(π·w_L).",
+  },
+  {
+    id: "telescope",
+    title: "Strahl aufweiten (Teleskop)",
+    goal:
+      "Mit zwei oder mehr Linsen den Strahl mindestens 1,8-fach aufweiten (oder verkleinern), " +
+      "sodass er hinter der letzten Linse kollimiert bleibt (z_R > 2 m).",
+    hint:
+      "Kepler: zwei Sammellinsen im Abstand f₁ + f₂, Vergrößerung f₂/f₁. Galilei: " +
+      "Zerstreuungs- + Sammellinse im Abstand f₂ − |f₁| – kürzer, ohne Zwischenfokus. " +
+      "Größerer Strahl → kleinere Divergenz und kleinerer Fokus danach.",
   },
   {
     id: "classify",

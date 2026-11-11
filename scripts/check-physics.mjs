@@ -32,6 +32,26 @@ const foc = P.throughThinLens(seg, 0.1, 0.1, lam);
 check("Fokus-Taille f=100 mm, w=4 mm [µm]", foc.w0 * 1e6, (lam * 0.1) / (Math.PI * 4e-3) * 1e6);
 check("Fokus-Lage ≈ f hinter der Linse [mm]", (foc.zWaist - 0.1) * 1e3, 100, 0.01);
 
+// Lens chain: Kepler telescope f1 = 50 mm, f2 = 150 mm, spacing f1 + f2
+// → beam expanded 3×, output still collimated (z_R grows by 9×)
+const kep = P.benchBeam({
+  w0: 0.5e-3, lambda: 532e-9, m2: 1,
+  lenses: [{ z: 0.1, focal: 0.05 }, { z: 0.3, focal: 0.15 }], zEnd: 0.65,
+});
+check("Kepler 1:3: Segmente", kep.length, 3, 0);
+check("Kepler 1:3: Aufweitung w_aus/w_ein", kep[2].w0 / kep[0].w0, 3, 0.01);
+check("Kepler 1:3: z_R-Verhältnis = 9", kep[2].zR / kep[0].zR, 9, 0.01);
+// Galilei telescope with diverging first lens: same expansion
+const gal = P.benchBeam({
+  w0: 0.5e-3, lambda: 532e-9, m2: 1,
+  lenses: [{ z: 0.15, focal: -0.05 }, { z: 0.25, focal: 0.15 }], zEnd: 0.65,
+});
+check("Galilei 1:3: Aufweitung", gal[2].w0 / gal[0].w0, 3, 0.01);
+// Lensmaker: plano-convex N-BK7 f = 100 mm → R1 = (n−1)·f = 51.68 mm
+check("Linsenmacher plankonvex R₁ [mm]", P.lensRadiiMm("planoconvex", 100)[0], 51.68, 0.001);
+const [r1, r2] = P.lensRadiiMm("meniscus_pos", 100);
+check("Linsenmacher Meniskus → f [mm]", 1 / ((P.N_BK7 - 1) * (1 / r1 - 1 / r2)), 100, 1e-9);
+
 // T0 law: threshold rises by e when T rises by T0
 const m = P.LASER_MODELS.dfb1550;
 check("I_th(25 °C + T0) = e · I_th,25", P.thresholdmA(m, 25 + m.t0K) / m.ithRefmA, Math.E);
