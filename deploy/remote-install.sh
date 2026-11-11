@@ -31,7 +31,9 @@ echo "✓ Node $("$NODE_BIN" -v) ($NODE_BIN)"
 
 # 2) Port free (or already ours)
 if sudo ss -tlnp | grep -q ":$PORT\b"; then
-  if sudo ss -tlnp | grep ":$PORT\b" | grep -q node && systemctl is-active --quiet ltor-backend; then
+  # Compare PIDs – the process name is not reliable (Node ≥ 24 shows "MainThread").
+  OUR_PID="$(systemctl show -p MainPID --value ltor-backend 2>/dev/null || echo 0)"
+  if [ "${OUR_PID:-0}" != "0" ] && sudo ss -tlnp | grep ":$PORT\b" | grep -q "pid=$OUR_PID,"; then
     echo "✓ Port $PORT gehört bereits ltor-backend (Update)"
   else
     echo "✗ Port $PORT ist von einem anderen Dienst belegt:" >&2
